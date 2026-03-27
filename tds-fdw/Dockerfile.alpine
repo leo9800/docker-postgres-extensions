@@ -1,0 +1,24 @@
+FROM postgres:18-alpine AS builder
+ARG GIT_TAG=v0.0.0
+RUN apk update && \
+    apk upgrade && \
+    apk add freetds-dev git gcc musl-dev make clang19 llvm19
+RUN git clone --depth 1 --branch ${GIT_TAG} https://github.com/tds-fdw/tds_fdw.git
+WORKDIR /tds_fdw
+RUN make USE_PGXS=1
+RUN make USE_PGXS=1 DESTDIR=/out install
+RUN echo $(scanelf \
+	--needed \
+	--nobanner \
+	--format '%n#p' \
+	--recursive /out \
+	| tr ',' '\n' \
+	| sort -u \
+	| awk 'system("[ -e /usr/local/lib/" $1 " ]") == 0 { next } { print "so:" $1 }'\
+	) > /deps
+
+FROM postgres:18-alpine AS product
+COPY --from=builder /out/. .
+COPY --from=builder /deps /deps
+RUN apk add --update --no-cache --no-progress $(cat /deps) && rm -f /deps
+

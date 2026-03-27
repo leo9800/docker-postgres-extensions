@@ -1,0 +1,13 @@
+FROM postgres:18-alpine AS builder
+ARG GIT_TAG=v0.0.0
+RUN apk update && \
+    apk upgrade && \
+    apk add build-base cargo rustfmt git pkgconfig openssl-dev clang19-libclang
+RUN git clone --depth 1 --branch ${GIT_TAG} https://github.com/CrunchyData/pg_parquet.git
+WORKDIR /pg_parquet
+RUN cargo install --force --locked cargo-pgrx@"$(sed -n 's/pgrx = "=\(.*\)"/\1/p' Cargo.toml)"
+RUN make install
+
+FROM postgres:18-alpine AS prod
+COPY --from=builder /usr/local/lib/postgresql/pg_parquet.so /usr/local/lib/postgresql/pg_parquet.so
+COPY --from=builder /usr/local/share/postgresql/extension/pg_parquet* /usr/local/share/postgresql/extension/
