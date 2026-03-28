@@ -1,12 +1,17 @@
 FROM postgres:18-alpine AS builder
-ARG GIT_TAG=0.0.0
+ARG PGVECTOR_TAG=v0.0.0
+ARG VCHORD_TAG=0.0.0
 RUN apk update && \
     apk upgrade && \
 # we need rust >= 1.93.0 to avoid https://github.com/rust-lang/rust/issues/135889
 # but rust 1.91.1 is shipped with alpine 3.23, we install rust-y libs from alpine edge repo 
     apk add cargo rustfmt --repository=https://dl-cdn.alpinelinux.org/alpine/edge/main && \
     apk add build-base git pkgconfig clang19-libclang clang19 llvm19
-RUN git clone --depth 1 --branch ${GIT_TAG} https://github.com/tensorchord/VectorChord
+RUN git clone --depth 1 --branch ${PGVECTOR_TAG} https://github.com/pgvector/pgvector
+RUN git clone --depth 1 --branch ${VCHORD_TAG} https://github.com/tensorchord/VectorChord
+WORKDIR /pgvector
+RUN make
+RUN make DESTDIR=/out install
 WORKDIR /VectorChord
 RUN make build
 RUN make DESTDIR=/out install
